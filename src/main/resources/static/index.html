@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ADAS Retrofit — пульт процесса</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --muted:#94a3b8; --line:#334155;
+          --accent:#38bdf8; --ok:#22c55e; --warn:#f59e0b; --text:#e2e8f0; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+         background:var(--bg); color:var(--text); line-height:1.45; }
+  header { padding:16px 24px; border-bottom:1px solid var(--line);
+           display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header a { color:var(--accent); text-decoration:none; font-size:14px; }
+  main { max-width:1000px; margin:0 auto; padding:24px; display:grid; gap:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; }
+  .card h2 { margin:0 0 14px; font-size:15px; text-transform:uppercase;
+             letter-spacing:.04em; color:var(--muted); }
+  label { display:block; font-size:13px; color:var(--muted); margin:8px 0 4px; }
+  input, select, textarea { width:100%; padding:8px 10px; border-radius:8px;
+                  border:1px solid var(--line); background:#0b1220; color:var(--text); font-size:14px;
+                  font-family:inherit; }
+  textarea { min-height:70px; resize:vertical; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  button { cursor:pointer; border:none; border-radius:8px; padding:9px 16px;
+           font-size:14px; font-weight:600; background:var(--accent); color:#04222f; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
+  button.small { padding:5px 10px; font-size:13px; }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .muted { color:var(--muted); font-size:13px; }
+  .badge { padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+  .b-DRAFT { background:#475569; color:#fff; }
+  .b-IN_PROGRESS { background:#0ea5e9; color:#04222f; }
+  .b-COMPLETED { background:var(--ok); color:#052e12; }
+  .b-CANCELLED { background:#ef4444; color:#fff; }
+  .task { padding:14px; border:1px solid var(--line); border-radius:10px; margin-bottom:12px;
+          background:#16233b; }
+  .task-head { display:flex; justify-content:space-between; align-items:center; gap:12px;
+               margin-bottom:10px; }
+  .task-head .tname { font-weight:600; }
+  .task-head small { color:var(--muted); font-weight:400; }
+  .form-grid { display:grid; gap:10px; }
+  ul.items { margin:6px 0 0; padding-left:18px; }
+  ul.items li { font-size:14px; }
+  .hidden { display:none; }
+  .kv { display:grid; grid-template-columns:170px 1fr; gap:4px 12px; font-size:14px; }
+  .kv div:nth-child(odd) { color:var(--muted); }
+  code { background:#0b1220; padding:1px 6px; border-radius:6px; font-size:12px; }
+  .ok-text { color:var(--ok); } .warn-text { color:var(--warn); }
+  .supply-row { display:grid; grid-template-columns:2fr 1fr 70px 32px; gap:8px; margin-bottom:8px; align-items:center; }
+  .supply-row.equip { grid-template-columns:2fr 1fr 32px; }
+  .supply-row button.del { background:#ef4444; color:#fff; padding:6px 0; }
+  .gallery { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+  .gallery a { display:block; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .gallery img { width:120px; height:90px; object-fit:cover; display:block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚗 ADAS Retrofit — пульт процесса</h1>
+  <a href="/camunda" target="_blank">Camunda Cockpit / Tasklist ↗</a>
+  <a href="/swagger-ui.html" target="_blank">Swagger UI ↗</a>
+</header>
+
+<main>
+  <!-- Создание / загрузка заявки -->
+  <section class="card">
+    <h2>Новая заявка</h2>
+    <div class="grid2">
+      <div><label>ФИО клиента</label><input id="customerFullName" value="Иван Иванов"/></div>
+      <div><label>Телефон</label><input id="customerPhone" value="+7 900 000-00-00"/></div>
+      <div><label>Email</label><input id="customerEmail" value="ivan@example.com"/></div>
+      <div><label>VIN</label><input id="vehicleVin" value="WVWZZZ1JZXW000001"/></div>
+      <div><label>Модель</label><input id="vehicleModel" value="VW Golf"/></div>
+      <div><label>Год</label><input id="vehicleYear" type="number" value="2019"/></div>
+      <div><label>Комплектация</label><input id="vehicleTrimLevel" value="Comfortline"/></div>
+      <div><label>Тип дооснащения</label>
+        <select id="retrofitType">
+          <option>ACC</option><option>BSA</option><option>AEB</option>
+          <option>LKA</option><option selected>COMBINED</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="createBtn">Создать заявку и запустить процесс</button>
+      <span class="muted">или</span>
+      <input id="existingId" placeholder="UUID существующей заявки" style="max-width:340px"/>
+      <button class="ghost" id="loadBtn">Загрузить</button>
+    </div>
+    <p id="createError" class="warn-text"></p>
+  </section>
+
+  <!-- Дашборд заявки -->
+  <section class="card hidden" id="dashboard">
+    <h2>Заявка</h2>
+    <div class="kv" id="orderInfo"></div>
+    <div class="row" style="margin:14px 0">
+      <button class="ghost" id="refreshBtn">Обновить</button>
+      <a id="cockpitLink" href="#" target="_blank"><button class="ghost">Открыть в Cockpit ↗</button></a>
+    </div>
+
+    <h2 style="margin-top:18px">Активные задачи</h2>
+    <div id="tasks"></div>
+    <p id="noTasks" class="muted hidden"></p>
+
+    <h2 style="margin-top:18px">Фотофиксация повреждений</h2>
+    <div class="gallery" id="gallery"></div>
+    <p id="noPhotos" class="muted">— фотографии ещё не загружены</p>
+
+    <h2 style="margin-top:18px">Снабжение</h2>
+    <div class="grid2">
+      <div><strong>Запчасти</strong> <span class="muted">(в авто)</span><ul class="items" id="parts"></ul></div>
+      <div><strong>Оборудование</strong> <span class="muted">(оснастка)</span><ul class="items" id="equipment"></ul></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const API = "/api/v1";
+let currentOrderId = null;
+
+// taskDefinitionKey → строитель формы
+const FORM_BUILDERS = {
+  "Activity_0gzebr4": buildAcceptanceForm,   // Первичная приёмка
+  "Activity_0f2hjgl": buildRequirementsForm, // Фиксация ТЗ
+  "Activity_0g5gyr1": buildPhotosForm,       // Фотофиксация
+  "Activity_15i5z4l": buildFeasibilityForm,  // Проверка возможности дооснащения
+  "Activity_0pa8xap": (t) => buildSupplyForm(t, "parts"),
+  "Activity_0gx280h": (t) => buildSupplyForm(t, "equipment"),
+  "Activity_0a02b3u": buildOrderSupplyForm,  // Заказ недостающего (статусы)
+  "Activity_1a1msli": buildIssueForm,        // Выдача исполнителям (чеклист)
+};
+
+const ORDER_STATUS_LABEL = {
+  TO_ORDER: "Нужно заказать",
+  ORDERED: "Заказано, ожидаем поступления",
+  RECEIVED: "Всё поступило на склад"
+};
+
+async function http(method, url, body) {
+  const opt = { method, headers: {} };
+  if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const res = await fetch(API + url, opt);
+  if (!res.ok) throw new Error(await res.text() || (res.status + " " + res.statusText));
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+function val(id) { return document.getElementById(id).value.trim(); }
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  for (const c of (Array.isArray(children) ? children : [children])) {
+    if (c != null) node.append(c.nodeType ? c : document.createTextNode(c));
+  }
+  return node;
+}
+
+document.getElementById("createBtn").onclick = async () => {
+  document.getElementById("createError").textContent = "";
+  try {
+    const req = {
+      customerFullName: val("customerFullName"),
+      customerPhone: val("customerPhone"),
+      customerEmail: val("customerEmail"),
+      vehicleVin: val("vehicleVin"),
+      vehicleModel: val("vehicleModel"),
+      vehicleYear: Number(val("vehicleYear")) || null,
+      vehicleTrimLevel: val("vehicleTrimLevel"),
+      retrofitType: val("retrofitType")
+    };
+    const order = await http("POST", "/orders", req);
+    currentOrderId = order.id;
+    await refresh();
+  } catch (e) { document.getElementById("createError").textContent = "Ошибка: " + e.message; }
+};
+
+document.getElementById("loadBtn").onclick = async () => {
+  const id = val("existingId");
+  if (!id) return;
+  currentOrderId = id;
+  try { await refresh(); }
+  catch (e) { document.getElementById("createError").textContent = "Ошибка: " + e.message; }
+};
+
+document.getElementById("refreshBtn").onclick = () => refresh();
+
+async function completeTask(taskId, variables) {
+  await http("POST", "/tasks/" + taskId + "/complete", variables || {});
+  await refresh();
+}
+
+// ---------- Формы user task ----------
+
+function buildAcceptanceForm(task) {
+  const mileage = el("input", { type: "number", placeholder: "Пробег, км" });
+  const plate = el("input", { placeholder: "Госномер (А123ВС 777)" });
+  const sts = el("input", { placeholder: "Номер СТС" });
+  const submit = el("button", { textContent: "Сохранить и завершить" });
+  submit.onclick = async () => {
+    await http("POST", `/orders/${currentOrderId}/acceptance`, {
+      mileage: Number(mileage.value) || null,
+      licensePlate: plate.value.trim(),
+      stsNumber: sts.value.trim(),
+      taskId: task.id
+    });
+    await refresh();
+  };
+  return el("div", { className: "form-grid" }, [
+    field("Пробег, км", mileage),
+    field("Госномер", plate),
+    field("Номер СТС", sts),
+    submit
+  ]);
+}
+
+function buildRequirementsForm(task) {
+  const area = el("textarea", { placeholder: "Пожелания клиента, список жалоб, что нужно дооснастить…" });
+  const submit = el("button", { textContent: "Сохранить и завершить" });
+  submit.onclick = async () => {
+    await http("POST", `/orders/${currentOrderId}/requirements`, {
+      clientRequirements: area.value.trim(),
+      taskId: task.id
+    });
+    await refresh();
+  };
+  return el("div", { className: "form-grid" }, [field("ТЗ / жалобы клиента", area), submit]);
+}
+
+function buildPhotosForm(task) {
+  const fileInput = el("input", { type: "file", accept: "image/*", multiple: true });
+  const uploadBtn = el("button", { className: "ghost", textContent: "Загрузить фото" });
+  const status = el("span", { className: "muted" });
+  uploadBtn.onclick = async () => {
+    if (!fileInput.files.length) { status.textContent = "Выберите файлы"; return; }
+    const fd = new FormData();
+    for (const f of fileInput.files) fd.append("files", f);
+    status.textContent = "Загрузка…";
+    const res = await fetch(`${API}/orders/${currentOrderId}/photos`, { method: "POST", body: fd });
+    if (!res.ok) { status.textContent = "Ошибка: " + await res.text(); return; }
+    fileInput.value = "";
+    status.textContent = "Загружено";
+    await refresh();
+  };
+  const done = el("button", { textContent: "Завершить фотофиксацию" });
+  done.onclick = () => completeTask(task.id);
+  return el("div", { className: "form-grid" }, [
+    el("div", { className: "row" }, [fileInput, uploadBtn, status]),
+    el("div", { className: "muted" }, "Фото сразу появятся в галерее ниже."),
+    done
+  ]);
+}
+
+function buildFeasibilityForm(task) {
+  const possible = el("select", {}, [
+    el("option", { value: "true", textContent: "Возможно — продолжить дооснащение" }),
+    el("option", { value: "false", textContent: "Невозможно — указать причину" })
+  ]);
+  const reason = el("textarea", { placeholder: "Причина отказа (если невозможно)" });
+  const reasonField = field("Причина", reason);
+  reasonField.classList.add("hidden");
+  possible.onchange = () => reasonField.classList.toggle("hidden", possible.value === "true");
+  const submit = el("button", { textContent: "Сохранить и завершить" });
+  submit.onclick = async () => {
+    await http("POST", `/orders/${currentOrderId}/feasibility`, {
+      possible: possible.value === "true",
+      comment: reason.value.trim(),
+      taskId: task.id
+    });
+    await refresh();
+  };
+  return el("div", { className: "form-grid" }, [field("Решение", possible), reasonField, submit]);
+}
+
+async function buildSupplyForm(task, kind) {
+  const isParts = kind === "parts";
+  const wrap = el("div", { className: "form-grid" });
+  const rows = el("div");
+  wrap.append(rows);
+
+  function addRow(item = {}) {
+    const name = el("input", { placeholder: "Наименование", value: item.name || "" });
+    const article = el("input", { placeholder: "Артикул", value: item.article || "" });
+    const del = el("button", { className: "del small", textContent: "✕" });
+    const row = el("div", { className: "supply-row" + (isParts ? "" : " equip") });
+    del.onclick = () => row.remove();
+    if (isParts) {
+      const qty = el("input", { type: "number", min: "1", value: item.quantity || 1 });
+      row.append(name, article, qty, del);
+      row._qty = qty;
+    } else {
+      row.append(name, article, del);
+    }
+    row._name = name; row._article = article;
+    rows.append(row);
+  }
+
+  const addBtn = el("button", { className: "ghost small", textContent: "+ строка" });
+  addBtn.onclick = () => addRow();
+  const submit = el("button", { textContent: "Сохранить список и завершить" });
+  submit.onclick = async () => {
+    const items = [...rows.children].map(r => ({
+      name: r._name.value.trim(),
+      article: r._article.value.trim(),
+      quantity: r._qty ? Number(r._qty.value) || 1 : 1
+    })).filter(i => i.name);
+    await http("POST", `/orders/${currentOrderId}/${kind}`, { items, taskId: task.id });
+    await refresh();
+  };
+
+  wrap.append(el("div", { className: "row" }, [addBtn]), submit);
+
+  // подсказка из каталога / ранее сохранённое
+  try {
+    const suggestion = await http("GET", `/orders/${currentOrderId}/${kind}/suggestion`);
+    if (suggestion && suggestion.length) suggestion.forEach(addRow);
+    else addRow();
+  } catch (e) { addRow(); }
+
+  return wrap;
+}
+
+async function buildOrderSupplyForm(task) {
+  const wrap = el("div", { className: "form-grid" });
+  const data = await http("GET", `/orders/${currentOrderId}/order-supply`);
+  const status = data.status || "TO_ORDER";
+
+  const missing = [
+    ...data.parts.map(p => `${p.name}${p.article ? " (" + p.article + ")" : ""} ×${p.quantity}`),
+    ...data.equipment.map(e => `${e.name}${e.article ? " (" + e.article + ")" : ""}`)
+  ];
+  const list = el("ul", { className: "items" });
+  if (missing.length) missing.forEach(m => list.append(el("li", { textContent: m })));
+  else list.append(el("li", { className: "muted", textContent: "— недостающих позиций нет" }));
+
+  const statusLine = el("div", {}, [
+    "Статус заказа: ",
+    el("strong", { textContent: ORDER_STATUS_LABEL[status] || status })
+  ]);
+
+  wrap.append(field("Нужно заказать", list), statusLine);
+
+  if (status === "TO_ORDER") {
+    const b = el("button", { textContent: "Оформить заказ → «Заказано»" });
+    b.onclick = async () => {
+      await http("POST", `/orders/${currentOrderId}/order-supply/advance`, { status: "ORDERED" });
+      await refresh();
+    };
+    wrap.append(b);
+  } else if (status === "ORDERED") {
+    const b = el("button", { textContent: "Отметить «Поступило» и завершить" });
+    b.onclick = async () => {
+      await http("POST", `/orders/${currentOrderId}/order-supply/advance`, { status: "RECEIVED", taskId: task.id });
+      await refresh();
+    };
+    wrap.append(b);
+  } else {
+    wrap.append(genericComplete(task));
+  }
+  return wrap;
+}
+
+async function buildIssueForm(task) {
+  const wrap = el("div", { className: "form-grid" });
+  const supply = await http("GET", `/orders/${currentOrderId}/supply`);
+  const checks = [];
+
+  function group(title, items, kind) {
+    if (!items.length) return null;
+    const box = el("div", {}, [el("label", { textContent: title })]);
+    for (const it of items) {
+      const cb = el("input", { type: "checkbox", checked: !it.issued, disabled: it.issued });
+      cb.style.width = "auto";
+      checks.push({ cb, id: it.id, kind });
+      const lbl = el("label", { style: "display:flex;gap:8px;align-items:center;color:var(--text);margin:4px 0" }, [
+        cb,
+        `${it.name}${it.article ? " (" + it.article + ")" : ""}${kind === "part" ? " ×" + it.quantity : ""}` +
+          (it.issued ? " — уже выдано" : "")
+      ]);
+      box.append(lbl);
+    }
+    return box;
+  }
+
+  const partsBox = group("Запчасти", supply.parts, "part");
+  const equipBox = group("Оборудование", supply.equipment, "equipment");
+  if (partsBox) wrap.append(partsBox);
+  if (equipBox) wrap.append(equipBox);
+
+  const submit = el("button", { textContent: "Выдать отмеченное и завершить" });
+  submit.onclick = async () => {
+    const partIds = checks.filter(c => c.kind === "part" && c.cb.checked && !c.cb.disabled).map(c => c.id);
+    const equipmentIds = checks.filter(c => c.kind === "equipment" && c.cb.checked && !c.cb.disabled).map(c => c.id);
+    await http("POST", `/orders/${currentOrderId}/issue`, { partIds, equipmentIds, taskId: task.id });
+    await refresh();
+  };
+  wrap.append(submit);
+  return wrap;
+}
+
+function field(labelText, control) {
+  return el("div", {}, [el("label", { textContent: labelText }), control]);
+}
+
+function genericComplete(task) {
+  const btn = el("button", { textContent: "Завершить" });
+  btn.onclick = () => completeTask(task.id);
+  return btn;
+}
+
+// ---------- Рендер ----------
+
+async function refresh() {
+  if (!currentOrderId) return;
+  const [order, supply, photos] = await Promise.all([
+    http("GET", "/orders/" + currentOrderId),
+    http("GET", "/orders/" + currentOrderId + "/supply"),
+    http("GET", "/orders/" + currentOrderId + "/photos")
+  ]);
+
+  document.getElementById("dashboard").classList.remove("hidden");
+
+  // Инфо о заявке
+  document.getElementById("orderInfo").innerHTML = `
+    <div>ID</div><div><code>${order.id}</code></div>
+    <div>Статус</div><div><span class="badge b-${order.status}">${order.status}</span></div>
+    <div>Тип дооснащения</div><div>${order.retrofitType}</div>
+    <div>Клиент</div><div>${order.customerFullName || "—"}</div>
+    <div>Авто</div><div>${order.vehicleModel || "—"} · VIN ${order.vehicleVin || "—"}</div>
+    <div>Госномер</div><div>${order.licensePlate || "—"}</div>
+    <div>СТС</div><div>${order.stsNumber || "—"}</div>
+    <div>Пробег</div><div>${order.mileage != null ? order.mileage + " км" : "—"}</div>
+    <div>ТЗ клиента</div><div>${order.clientRequirements || "—"}</div>
+    ${order.feasibilityComment ? `<div>Причина отказа</div><div class="warn-text">${order.feasibilityComment}</div>` : ""}
+    ${order.supplyOrderStatus ? `<div>Статус заказа</div><div>${ORDER_STATUS_LABEL[order.supplyOrderStatus] || order.supplyOrderStatus}</div>` : ""}
+    <div>Process Instance</div><div><code>${order.processInstanceId || "—"}</code></div>`;
+
+  const link = document.getElementById("cockpitLink");
+  link.href = order.processInstanceId
+    ? `/camunda/app/cockpit/default/#/process-instance/${order.processInstanceId}/runtime`
+    : "/camunda";
+
+  // Активные задачи (каждая — со своей формой)
+  const tasksEl = document.getElementById("tasks");
+  const noTasks = document.getElementById("noTasks");
+  tasksEl.innerHTML = "";
+  const tasks = order.activeTasks || [];
+  if (tasks.length === 0) {
+    noTasks.classList.remove("hidden");
+    noTasks.textContent = order.status === "COMPLETED"
+      ? "✅ Процесс завершён — активных задач нет."
+      : "Активных задач нет.";
+  } else {
+    noTasks.classList.add("hidden");
+    for (const t of tasks) {
+      const card = el("div", { className: "task" });
+      card.append(el("div", { className: "task-head" }, [
+        el("div", { className: "tname" }, [t.name, el("br"), el("small", { textContent: t.taskDefinitionKey || t.id })])
+      ]));
+      const builder = FORM_BUILDERS[t.taskDefinitionKey];
+      if (builder) {
+        const built = builder(t);
+        // строитель формы может быть асинхронным (parts/equipment)
+        if (built instanceof Promise) {
+          const placeholder = el("div", { className: "muted", textContent: "Загрузка формы…" });
+          card.append(placeholder);
+          built.then(node => placeholder.replaceWith(node));
+        } else {
+          card.append(built);
+        }
+      } else {
+        card.append(genericComplete(t));
+      }
+      tasksEl.appendChild(card);
+    }
+  }
+
+  // Галерея фото
+  const gallery = document.getElementById("gallery");
+  const noPhotos = document.getElementById("noPhotos");
+  gallery.innerHTML = "";
+  if (photos && photos.length) {
+    noPhotos.classList.add("hidden");
+    for (const p of photos) {
+      const a = el("a", { href: p.url, target: "_blank", title: p.originalFilename || "" });
+      a.append(el("img", { src: p.url, alt: p.originalFilename || "" }));
+      gallery.append(a);
+    }
+  } else {
+    noPhotos.classList.remove("hidden");
+  }
+
+  // Снабжение
+  const parts = document.getElementById("parts");
+  const equip = document.getElementById("equipment");
+  const stock = ok => ok ? '<span class="ok-text">✓ в наличии</span>' : '<span class="warn-text">нет на складе</span>';
+  const iss = on => on ? ' <span class="ok-text">⮌ выдано</span>' : "";
+  parts.innerHTML = supply.parts.length
+    ? supply.parts.map(p => `<li>${p.name}${p.article ? ` <code>${p.article}</code>` : ""} ×${p.quantity} ${stock(p.inStock)}${iss(p.issued)}</li>`).join("")
+    : '<li class="muted">— список ещё не сформирован</li>';
+  equip.innerHTML = supply.equipment.length
+    ? supply.equipment.map(e => `<li>${e.name}${e.article ? ` <code>${e.article}</code>` : ""} ${stock(e.inStock)}${iss(e.issued)}</li>`).join("")
+    : '<li class="muted">— список ещё не сформирован</li>';
+}
+</script>
+</body>
+</html>

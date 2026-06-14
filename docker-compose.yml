@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: adas-postgres
+    environment:
+      POSTGRES_DB: adas
+      POSTGRES_USER: adas
+      POSTGRES_PASSWORD: adas
+    ports:
+      - "5432:5432"
+    volumes:
+      - adas-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adas -d adas"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: adas-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # веб-консоль MinIO
+    volumes:
+      - adas-minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: adas-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: adas
+      DB_USER: adas
+      DB_PASSWORD: adas
+      CAMUNDA_ADMIN_USER: admin
+      CAMUNDA_ADMIN_PASSWORD: admin
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: adas-photos
+    ports:
+      - "8080:8080"
+
+volumes:
+  adas-pgdata:
+  adas-minio:
