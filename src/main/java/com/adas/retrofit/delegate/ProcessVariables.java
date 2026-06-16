@@ -51,6 +51,9 @@ public final class ProcessVariables {
     /** Тип неисправности при доработке (CODING / DISMANTLE / иное → перемонтаж). */
     public static final String FAULT_TYPE = "faultType";
 
+    /** Прошла ли система тест-драйв (после «Проверка системы и тест-драйв»). */
+    public static final String TEST_DRIVE_PASSED = "testDrivePassed";
+
     /** Демо-override: принудительно считать запчасти отсутствующими (для ветки заказа). */
     public static final String PARTS_SHORTAGE = "partsShortage";
 
@@ -72,6 +75,7 @@ public final class ProcessVariables {
         vars.put(CLIENT_ACCEPTED, true);
         vars.put(SUPPLY_OK, true);
         vars.put(FAULT_TYPE, "NONE");
+        vars.put(TEST_DRIVE_PASSED, true);
         return vars;
     }
 }

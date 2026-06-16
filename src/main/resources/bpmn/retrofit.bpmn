@@ -430,7 +430,9 @@
       <bpmn:outgoing>Flow_1ywnxml</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:sequenceFlow id="Flow_0nrcfk2" sourceRef="Gateway_1n2411l" targetRef="Activity_1yuq8rv" />
-    <bpmn:sequenceFlow id="Flow_1ywnxml" sourceRef="Gateway_1n2411l" targetRef="Activity_0kgksar" />
+    <bpmn:sequenceFlow id="Flow_1ywnxml" sourceRef="Gateway_1n2411l" targetRef="Activity_0kgksar">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${testDrivePassed == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_0xh2fmy">

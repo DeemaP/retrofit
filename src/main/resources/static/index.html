@@ -132,6 +132,10 @@ const FORM_BUILDERS = {
   "Activity_0gx280h": (t) => buildSupplyForm(t, "equipment"),
   "Activity_0a02b3u": buildOrderSupplyForm,  // Заказ недостающего (статусы)
   "Activity_1a1msli": buildIssueForm,        // Выдача исполнителям (чеклист)
+  "Activity_0xl0n6f": buildCalibrationForm,  // Кодирование и калибровка (исход)
+  "Activity_0p38zs6": buildTestDriveForm,    // Проверка системы и тест-драйв (исход)
+  "Activity_1rt6csz": buildTransferForm,     // Передача автомобиля клиенту (исход)
+  "Activity_0kgksar": buildFaultForm,        // Выявление причины неисправности
 };
 
 const ORDER_STATUS_LABEL = {
@@ -399,6 +403,51 @@ async function buildIssueForm(task) {
   };
   wrap.append(submit);
   return wrap;
+}
+
+// Кодирование и калибровка → systemHealthy (исправна / неисправна)
+function buildCalibrationForm(task) {
+  const sel = el("select", {}, [
+    el("option", { value: "true", textContent: "Система исправна — на тест-драйв" }),
+    el("option", { value: "false", textContent: "Система неисправна — на выявление причины" })
+  ]);
+  const submit = el("button", { textContent: "Завершить" });
+  submit.onclick = () => completeTask(task.id, { systemHealthy: sel.value === "true" });
+  return el("div", { className: "form-grid" }, [field("Результат калибровки", sel), submit]);
+}
+
+// Проверка системы и тест-драйв → testDrivePassed (пройден / не пройден)
+function buildTestDriveForm(task) {
+  const sel = el("select", {}, [
+    el("option", { value: "true", textContent: "Тест-драйв пройден — к выдаче документов" }),
+    el("option", { value: "false", textContent: "Тест-драйв не пройден — на выявление причины" })
+  ]);
+  const submit = el("button", { textContent: "Завершить" });
+  submit.onclick = () => completeTask(task.id, { testDrivePassed: sel.value === "true" });
+  return el("div", { className: "form-grid" }, [field("Результат тест-драйва", sel), submit]);
+}
+
+// Передача автомобиля клиенту → clientAccepted (принял / отказался)
+function buildTransferForm(task) {
+  const sel = el("select", {}, [
+    el("option", { value: "true", textContent: "Клиент принял работу — завершить процесс" }),
+    el("option", { value: "false", textContent: "Клиент отказался — на выявление причины" })
+  ]);
+  const submit = el("button", { textContent: "Завершить" });
+  submit.onclick = () => completeTask(task.id, { clientAccepted: sel.value === "true" });
+  return el("div", { className: "form-grid" }, [field("Приёмка клиентом", sel), submit]);
+}
+
+// Выявление причины неисправности → faultType (повторная калибровка / демонтаж / перемонтаж)
+function buildFaultForm(task) {
+  const sel = el("select", {}, [
+    el("option", { value: "CODING", textContent: "Ошибка кодирования/калибровки — повторить калибровку" }),
+    el("option", { value: "REMOUNT", textContent: "Ошибка монтажа — повторный монтаж" }),
+    el("option", { value: "DISMANTLE", textContent: "Дооснащение невозможно — демонтаж и возврат" })
+  ]);
+  const submit = el("button", { textContent: "Завершить" });
+  submit.onclick = () => completeTask(task.id, { faultType: sel.value });
+  return el("div", { className: "form-grid" }, [field("Причина неисправности", sel), submit]);
 }
 
 function field(labelText, control) {

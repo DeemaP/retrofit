@@ -131,7 +131,7 @@ src/test/java/     — зеркалит main
 
 ### Промежуточные события
 
-В модели есть `intermediateThrowEvent` (3) и `intermediateCatchEvent` (1) — это message events для коммуникации (например, ожидание поставки от поставщика). Реализовать через Camunda message correlation: throw — отправка/публикация, catch — ожидание с корреляцией по бизнес-ключу (orderId). Эндпоинт для доставки внешнего сообщения: `POST /api/v1/messages/{messageName}` с orderId → `runtimeService.createMessageCorrelation(...).processInstanceBusinessKey(orderId).correlate()`.
+В модели есть `intermediateThrowEvent` (3) и `intermediateCatchEvent` (1) — это **link events** (имя ссылки `Return`, «Выдача автомобиля клиенту»), а не message events. Все три throw-точки (дооснащение невозможно; отказ в поставке; демонтаж/возврат завершён) — это внутренние goto к одному catch перед подготовкой документации (`Activity_1yuq8rv`): в любом сценарии завершения авто возвращается клиенту с документами. Link events обрабатываются движком Camunda внутри одного экземпляра процесса — внешняя корреляция и эндпоинт доставки сообщений **не нужны**.
 
 ### Шлюзы
 
@@ -158,14 +158,13 @@ JSONB-поля мапить через Hibernate (`@JdbcTypeCode(SqlTypes.JSON)`
 - `GET /api/v1/tasks?orderId=` или `?group=` — активные user task (TaskService).
 - `POST /api/v1/tasks/{taskId}/complete` — завершить задачу с переменными.
 - `POST /api/v1/orders/{id}/components` — добавить компоненты.
-- `POST /api/v1/messages/{messageName}` — доставка message event (корреляция по orderId).
 - `GET /api/v1/orders/{id}/act` — акт соответствия.
 
 ## Definition of Done
 
 - Вся BPMN-модель развёрнута и исполняется; пройден полный happy-path И хотя бы один сценарий с ветвлением (нет на складе → заказ; неудача теста → выявление причины → демонтаж/возврат).
 - Все 9 делегатов реализованы и вызываются.
-- Message events корректно коррелируются.
+- Link events («Выдача автомобиля клиенту») корректно сходятся к подготовке документации во всех сценариях завершения.
 - `mvn test` зелёный: минимум — 1 process-тест happy-path, 1 process-тест ветки исключения, по 1 тесту на нетривиальный делегат и на OrderController.
 - Через Swagger можно провести заявку по процессу; всё видно в Cockpit.
 
