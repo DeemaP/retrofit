@@ -3,19 +3,29 @@ package com.adas.retrofit.controller;
 import com.adas.retrofit.delegate.ProcessVariables;
 import com.adas.retrofit.dto.AcceptanceRequest;
 import com.adas.retrofit.dto.AdvanceOrderRequest;
+import com.adas.retrofit.dto.CalibrationView;
+import com.adas.retrofit.dto.ChecklistItemDto;
+import com.adas.retrofit.dto.ChecklistItemView;
+import com.adas.retrofit.dto.ChecklistRequest;
+import com.adas.retrofit.dto.CodingRequest;
 import com.adas.retrofit.dto.FeasibilityRequest;
 import com.adas.retrofit.dto.IssueRequest;
 import com.adas.retrofit.dto.OrderSupplyView;
 import com.adas.retrofit.dto.PhotoView;
+import com.adas.retrofit.dto.ProgrammingRequest;
+import com.adas.retrofit.dto.ProgrammingView;
 import com.adas.retrofit.dto.RequirementsRequest;
 import com.adas.retrofit.dto.SupplyItem;
 import com.adas.retrofit.dto.SupplyListRequest;
 import com.adas.retrofit.entity.DamagePhoto;
+import com.adas.retrofit.entity.ProgrammingDirection;
 import com.adas.retrofit.entity.SupplyOrderStatus;
+import com.adas.retrofit.entity.WorkPhase;
 import com.adas.retrofit.service.OrderService;
 import com.adas.retrofit.service.PhotoStorageService;
 import com.adas.retrofit.service.SpecCatalogService;
 import com.adas.retrofit.service.SupplyService;
+import com.adas.retrofit.service.WorkService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.camunda.bpm.engine.TaskService;
@@ -51,17 +61,20 @@ public class TaskFormController {
     private final SupplyService supplyService;
     private final SpecCatalogService specCatalogService;
     private final PhotoStorageService photoStorageService;
+    private final WorkService workService;
     private final TaskService taskService;
 
     public TaskFormController(OrderService orderService,
                               SupplyService supplyService,
                               SpecCatalogService specCatalogService,
                               PhotoStorageService photoStorageService,
+                              WorkService workService,
                               TaskService taskService) {
         this.orderService = orderService;
         this.supplyService = supplyService;
         this.specCatalogService = specCatalogService;
         this.photoStorageService = photoStorageService;
+        this.workService = workService;
         this.taskService = taskService;
     }
 
@@ -194,6 +207,86 @@ public class TaskFormController {
     public void issue(@PathVariable UUID orderId, @RequestBody IssueRequest req) {
         supplyService.issue(orderId, req.partIds(), req.equipmentIds());
         completeIfPresent(req.taskId(), Map.of());
+    }
+
+    // --- 9. Монтажные и слесарные работы (чек-лист) ---
+
+    @GetMapping("/assembly")
+    @Operation(summary = "Чек-лист монтажных работ (сохранённый или предустановленные этапы)")
+    public List<ChecklistItemView> assembly(@PathVariable UUID orderId) {
+        return workService.checklist(orderId, WorkPhase.ASSEMBLY).stream()
+                .map(ChecklistItemView::of).toList();
+    }
+
+    @PostMapping("/assembly")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Сохранить чек-лист монтажа + завершить задачу")
+    public void saveAssembly(@PathVariable UUID orderId, @RequestBody ChecklistRequest req) {
+        workService.saveChecklist(orderId, WorkPhase.ASSEMBLY, toEntries(req.items()));
+        completeIfPresent(req.taskId(), Map.of());
+    }
+
+    // --- 10. Кодирование и калибровка ---
+
+    @GetMapping("/programming")
+    @Operation(summary = "Записи программирования ЭБУ по заявке")
+    public List<ProgrammingView> programming(@PathVariable UUID orderId) {
+        return workService.programmingOf(orderId).stream().map(ProgrammingView::of).toList();
+    }
+
+    @GetMapping("/calibration")
+    @Operation(summary = "Записи калибровки по заявке")
+    public List<CalibrationView> calibration(@PathVariable UUID orderId) {
+        return workService.calibrationOf(orderId).stream().map(CalibrationView::of).toList();
+    }
+
+    @PostMapping("/coding")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Кодирование ЭБУ + калибровка; systemHealthy управляет гейтвеем + завершение")
+    public void coding(@PathVariable UUID orderId, @RequestBody CodingRequest req) {
+        workService.saveProgramming(orderId, req.ecuName(), req.swBefore(), req.swAfter(),
+                req.activatedFeatures(), ProgrammingDirection.INSTALL);
+        workService.saveCalibration(orderId, req.calibrationType(),
+                req.calibrationParameters(), req.calibrationPassed());
+        completeIfPresent(req.taskId(),
+                Map.of(ProcessVariables.SYSTEM_HEALTHY, req.systemHealthy()));
+    }
+
+    // --- 11. Демонтаж установленной системы (чек-лист) ---
+
+    @GetMapping("/disassembly")
+    @Operation(summary = "Чек-лист демонтажа (сохранённый или предустановленные этапы)")
+    public List<ChecklistItemView> disassembly(@PathVariable UUID orderId) {
+        return workService.checklist(orderId, WorkPhase.DISASSEMBLY).stream()
+                .map(ChecklistItemView::of).toList();
+    }
+
+    @PostMapping("/disassembly")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Сохранить чек-лист демонтажа + завершить задачу")
+    public void saveDisassembly(@PathVariable UUID orderId, @RequestBody ChecklistRequest req) {
+        workService.saveChecklist(orderId, WorkPhase.DISASSEMBLY, toEntries(req.items()));
+        completeIfPresent(req.taskId(), Map.of());
+    }
+
+    // --- 12. Возврат авто в изначальное состояние (программирование RESTORE) ---
+
+    @PostMapping("/restore")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Восстановление исходного ПО ЭБУ (RESTORE) + завершение задачи")
+    public void restore(@PathVariable UUID orderId, @RequestBody ProgrammingRequest req) {
+        workService.saveProgramming(orderId, req.ecuName(), req.swBefore(), req.swAfter(),
+                req.activatedFeatures(), ProgrammingDirection.RESTORE);
+        completeIfPresent(req.taskId(), Map.of());
+    }
+
+    private static List<WorkService.ChecklistEntry> toEntries(List<ChecklistItemDto> items) {
+        if (items == null) {
+            return List.of();
+        }
+        return items.stream()
+                .map(i -> new WorkService.ChecklistEntry(i.title(), i.done()))
+                .toList();
     }
 
     private void completeIfPresent(String taskId, Map<String, Object> variables) {

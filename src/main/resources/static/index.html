@@ -115,6 +115,12 @@
       <div><strong>Запчасти</strong> <span class="muted">(в авто)</span><ul class="items" id="parts"></ul></div>
       <div><strong>Оборудование</strong> <span class="muted">(оснастка)</span><ul class="items" id="equipment"></ul></div>
     </div>
+
+    <h2 style="margin-top:18px">Программирование и калибровка</h2>
+    <div class="grid2">
+      <div><strong>Программирование ЭБУ</strong><ul class="items" id="programming"></ul></div>
+      <div><strong>Калибровка</strong><ul class="items" id="calibration"></ul></div>
+    </div>
   </section>
 </main>
 
@@ -132,10 +138,13 @@ const FORM_BUILDERS = {
   "Activity_0gx280h": (t) => buildSupplyForm(t, "equipment"),
   "Activity_0a02b3u": buildOrderSupplyForm,  // Заказ недостающего (статусы)
   "Activity_1a1msli": buildIssueForm,        // Выдача исполнителям (чеклист)
-  "Activity_0xl0n6f": buildCalibrationForm,  // Кодирование и калибровка (исход)
+  "Activity_1asctpd": (t) => buildChecklistForm(t, "assembly"),     // Монтажные и слесарные работы
+  "Activity_0xl0n6f": buildCodingForm,       // Кодирование и калибровка
   "Activity_0p38zs6": buildTestDriveForm,    // Проверка системы и тест-драйв (исход)
   "Activity_1rt6csz": buildTransferForm,     // Передача автомобиля клиенту (исход)
   "Activity_0kgksar": buildFaultForm,        // Выявление причины неисправности
+  "Activity_05mqhxj": (t) => buildChecklistForm(t, "disassembly"), // Демонтаж установленной системы
+  "Activity_08k31yn": buildRestoreForm,      // Возврат авто в изначальное состояние
 };
 
 const ORDER_STATUS_LABEL = {
@@ -405,15 +414,101 @@ async function buildIssueForm(task) {
   return wrap;
 }
 
-// Кодирование и калибровка → systemHealthy (исправна / неисправна)
-function buildCalibrationForm(task) {
-  const sel = el("select", {}, [
+// Кодирование и калибровка → ProgrammingRecord + CalibrationRecord + systemHealthy
+function buildCodingForm(task) {
+  const ecu = el("input", { placeholder: "ЭБУ (напр. «Камера ADAS»)" });
+  const swBefore = el("input", { placeholder: "ПО до" });
+  const swAfter = el("input", { placeholder: "ПО после" });
+  const features = el("textarea", { placeholder: "Активированные функции (через запятую)" });
+  const calType = el("select", {}, [
+    el("option", { value: "STATIC", textContent: "Статическая (по мишеням)" }),
+    el("option", { value: "DYNAMIC", textContent: "Динамическая (в движении)" })
+  ]);
+  const calParams = el("textarea", { placeholder: "Параметры калибровки" });
+  const calPassed = el("select", {}, [
+    el("option", { value: "true", textContent: "Калибровка пройдена" }),
+    el("option", { value: "false", textContent: "Калибровка не пройдена" })
+  ]);
+  const healthy = el("select", {}, [
     el("option", { value: "true", textContent: "Система исправна — на тест-драйв" }),
     el("option", { value: "false", textContent: "Система неисправна — на выявление причины" })
   ]);
-  const submit = el("button", { textContent: "Завершить" });
-  submit.onclick = () => completeTask(task.id, { systemHealthy: sel.value === "true" });
-  return el("div", { className: "form-grid" }, [field("Результат калибровки", sel), submit]);
+  const submit = el("button", { textContent: "Сохранить и завершить" });
+  submit.onclick = async () => {
+    await http("POST", `/orders/${currentOrderId}/coding`, {
+      ecuName: ecu.value.trim(),
+      swBefore: swBefore.value.trim(),
+      swAfter: swAfter.value.trim(),
+      activatedFeatures: features.value.trim(),
+      calibrationType: calType.value,
+      calibrationParameters: calParams.value.trim(),
+      calibrationPassed: calPassed.value === "true",
+      systemHealthy: healthy.value === "true",
+      taskId: task.id
+    });
+    await refresh();
+  };
+  return el("div", { className: "form-grid" }, [
+    field("ЭБУ", ecu),
+    el("div", { className: "row" }, [field("ПО до", swBefore), field("ПО после", swAfter)]),
+    field("Активированные функции", features),
+    field("Тип калибровки", calType),
+    field("Параметры калибровки", calParams),
+    field("Результат калибровки", calPassed),
+    field("Итог проверки системы", healthy),
+    submit
+  ]);
+}
+
+// Чек-лист слесарно-монтажных работ (assembly = монтаж, disassembly = демонтаж)
+async function buildChecklistForm(task, kind) {
+  const wrap = el("div", { className: "form-grid" });
+  const rows = [];
+  let items = [];
+  try { items = await http("GET", `/orders/${currentOrderId}/${kind}`) || []; } catch (e) { items = []; }
+
+  const box = el("div", {});
+  for (const it of items) {
+    const cb = el("input", { type: "checkbox", checked: it.done });
+    cb.style.width = "auto";
+    rows.push({ cb, title: it.title });
+    box.append(el("label", { style: "display:flex;gap:8px;align-items:center;color:var(--text);margin:4px 0" }, [
+      cb, it.title
+    ]));
+  }
+  const submit = el("button", { textContent: "Сохранить и завершить" });
+  submit.onclick = async () => {
+    const payload = rows.map(r => ({ title: r.title, done: r.cb.checked }));
+    await http("POST", `/orders/${currentOrderId}/${kind}`, { items: payload, taskId: task.id });
+    await refresh();
+  };
+  wrap.append(field(kind === "assembly" ? "Этапы монтажа" : "Этапы демонтажа", box), submit);
+  return wrap;
+}
+
+// Возврат авто в изначальное состояние → программирование RESTORE
+function buildRestoreForm(task) {
+  const ecu = el("input", { placeholder: "ЭБУ" });
+  const swBefore = el("input", { placeholder: "ПО до возврата" });
+  const swAfter = el("input", { placeholder: "Исходное ПО (после возврата)" });
+  const features = el("textarea", { placeholder: "Деактивированные функции / примечание" });
+  const submit = el("button", { textContent: "Сохранить и завершить" });
+  submit.onclick = async () => {
+    await http("POST", `/orders/${currentOrderId}/restore`, {
+      ecuName: ecu.value.trim(),
+      swBefore: swBefore.value.trim(),
+      swAfter: swAfter.value.trim(),
+      activatedFeatures: features.value.trim(),
+      taskId: task.id
+    });
+    await refresh();
+  };
+  return el("div", { className: "form-grid" }, [
+    field("ЭБУ", ecu),
+    el("div", { className: "row" }, [field("ПО до возврата", swBefore), field("Исходное ПО", swAfter)]),
+    field("Примечание", features),
+    submit
+  ]);
 }
 
 // Проверка системы и тест-драйв → testDrivePassed (пройден / не пройден)
@@ -464,10 +559,12 @@ function genericComplete(task) {
 
 async function refresh() {
   if (!currentOrderId) return;
-  const [order, supply, photos] = await Promise.all([
+  const [order, supply, photos, programming, calibration] = await Promise.all([
     http("GET", "/orders/" + currentOrderId),
     http("GET", "/orders/" + currentOrderId + "/supply"),
-    http("GET", "/orders/" + currentOrderId + "/photos")
+    http("GET", "/orders/" + currentOrderId + "/photos"),
+    http("GET", "/orders/" + currentOrderId + "/programming"),
+    http("GET", "/orders/" + currentOrderId + "/calibration")
   ]);
 
   document.getElementById("dashboard").classList.remove("hidden");
@@ -553,6 +650,20 @@ async function refresh() {
   equip.innerHTML = supply.equipment.length
     ? supply.equipment.map(e => `<li>${e.name}${e.article ? ` <code>${e.article}</code>` : ""} ${stock(e.inStock)}${iss(e.issued)}</li>`).join("")
     : '<li class="muted">— список ещё не сформирован</li>';
+
+  // Программирование и калибровка
+  const DIR_LABEL = { INSTALL: "дооснащение", RESTORE: "возврат" };
+  const prog = document.getElementById("programming");
+  prog.innerHTML = (programming && programming.length)
+    ? programming.map(p => `<li>${p.ecuName || "ЭБУ"}: <code>${p.swBefore || "—"}</code> → <code>${p.swAfter || "—"}</code>` +
+        ` <span class="muted">(${DIR_LABEL[p.direction] || p.direction})</span>` +
+        `${p.activatedFeatures ? `<br><small>${p.activatedFeatures}</small>` : ""}</li>`).join("")
+    : '<li class="muted">— записей нет</li>';
+  const cal = document.getElementById("calibration");
+  cal.innerHTML = (calibration && calibration.length)
+    ? calibration.map(c => `<li>${c.type === "DYNAMIC" ? "Динамическая" : "Статическая"} ${c.passed ? '<span class="ok-text">✓ пройдена</span>' : '<span class="warn-text">не пройдена</span>'}` +
+        `${c.parameters ? `<br><small>${c.parameters}</small>` : ""}</li>`).join("")
+    : '<li class="muted">— записей нет</li>';
 }
 </script>
 </body>
