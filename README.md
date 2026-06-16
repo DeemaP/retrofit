@@ -1,0 +1,106 @@
+# ADAS Retrofit
+
+Программный комплекс для автоматизации и контроля процесса дооснащения автомобилей
+системами активной безопасности (ADAS) в сервисных центрах. Магистерская диссертация.
+
+Ядро — BPM-движок **Camunda 7**, встроенный в **Spring Boot**. Бизнес-процесс дооснащения
+задан BPMN-моделью (`src/main/resources/bpmn/retrofit.bpmn`), которую исполняет движок.
+Интерфейс оператора — лёгкий веб-пульт (`/`), документация API — Swagger UI,
+ход процесса виден в Camunda Cockpit.
+
+## Стек
+
+- Java 17 (LTS), Spring Boot 3.2
+- Camunda Platform 7
+- PostgreSQL 15
+- MinIO (S3-совместимое хранилище фотофиксации повреждений)
+- Maven
+
+## Запуск через Docker (рекомендуется)
+
+Образ приложения собирается **внутри контейнера** (Maven + Temurin 17), поэтому на машине
+нужны только **Docker** и **Docker Compose v2** + интернет (для загрузки базовых образов и
+зависимостей). Java и Maven локально ставить НЕ нужно.
+
+```bash
+# из корня проекта
+docker compose up -d --build
+```
+
+Поднимутся три контейнера: `adas-app`, `adas-postgres`, `adas-minio`.
+Первая сборка занимает несколько минут (скачивание зависимостей), последующие — быстрее
+за счёт кэша слоёв.
+
+Проверить состояние и дождаться готовности приложения:
+
+```bash
+docker compose ps
+docker compose logs -f app      # ждём строку "Started AdasRetrofitApplication"
+```
+
+### Точки входа
+
+| Что | URL | Доступ |
+|-----|-----|--------|
+| Веб-пульт оператора | http://localhost:8080/ | — |
+| Swagger UI | http://localhost:8080/swagger-ui.html | — |
+| Camunda Cockpit | http://localhost:8080/camunda | `admin` / `admin` |
+| MinIO консоль | http://localhost:9001 | `minioadmin` / `minioadmin` |
+
+Нужны свободные порты: **8080** (приложение), **5432** (PostgreSQL), **9000/9001** (MinIO).
+
+### Управление
+
+```bash
+docker compose logs -f app        # логи приложения
+docker compose down               # остановить (данные сохраняются в томах)
+docker compose down -v            # остановить и сбросить данные (БД Camunda + MinIO)
+docker compose up -d --build app  # пересобрать и перезапустить только приложение
+```
+
+Данные БД и фотографий хранятся в Docker-томах `adas-pgdata` и `adas-minio` и переживают
+`docker compose down`. Для чистого старта с нуля — `docker compose down -v`.
+
+### Конфигурация
+
+Все параметры задаются переменными окружения в `docker-compose.yml` (имеют разумные
+значения по умолчанию в `application.yml`):
+
+| Переменная | Назначение | По умолчанию |
+|-----------|-----------|--------------|
+| `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | подключение к PostgreSQL | `postgres` / `5432` / `adas` / `adas` / `adas` |
+| `CAMUNDA_ADMIN_USER` / `CAMUNDA_ADMIN_PASSWORD` | админ Cockpit | `admin` / `admin` |
+| `MINIO_ENDPOINT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` | хранилище фото | `http://minio:9000` / `minioadmin` / `minioadmin` / `adas-photos` |
+
+Схема БД создаётся и обновляется автоматически (`ddl-auto=update`) — миграции запускать
+вручную не нужно.
+
+## Как пройти процесс
+
+1. Открыть веб-пульт http://localhost:8080/ и создать заявку (форма слева).
+2. Выполнять активные задачи сверху вниз — у каждой своя форма.
+3. Развилки доступны прямо в формах: возможность дооснащения (можно/нельзя),
+   результат калибровки и тест-драйва, приёмка клиентом, причина неисправности.
+4. Ход процесса и токены можно смотреть в Cockpit (ссылка «Открыть в Cockpit» на пульте).
+
+Ветка «нет на складе → заказ» включается стартовой переменной процесса
+`partsShortage=true` / `equipmentShortage=true` (через Swagger или Cockpit).
+
+## Локальный запуск без Docker (опционально)
+
+Нужны Java 17, Maven и поднятые PostgreSQL + MinIO (можно через
+`docker compose up -d postgres minio`). Затем:
+
+```bash
+mvn spring-boot:run
+```
+
+Приложение по умолчанию подключается к `localhost:5432` (БД) и `localhost:9000` (MinIO).
+
+## Тесты
+
+```bash
+mvn test
+```
+
+Тесты используют встроенную H2 и in-process движок Camunda — внешние сервисы не нужны.
