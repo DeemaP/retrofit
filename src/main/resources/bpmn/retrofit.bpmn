@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bioc="http://bpmn.io/schema/bpmn/biocolor/1.0" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_00k8i79" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.37.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.24.0">
+<bpmn:definitions xmlns:bioc="http://bpmn.io/schema/bpmn/biocolor/1.0" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_00k8i79" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.37.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.24.0">
   <bpmn:collaboration id="Collaboration_0xh2fmy">
     <bpmn:participant id="Participant_0e3gto7" name="Дооснащение" processRef="Process_1p16tp4" />
     <bpmn:textAnnotation id="TextAnnotation_0iam0qq">
@@ -103,6 +103,10 @@
     </bpmn:textAnnotation>
     <bpmn:association id="Association_1s2a2wn" associationDirection="None" sourceRef="Flow_0xli0u8" targetRef="TextAnnotation_1bmbjsk" />
     <bpmn:association id="Association_1jcf24f" associationDirection="None" sourceRef="TextAnnotation_1ivavdt" targetRef="Flow_01gcw7i" />
+    <bpmn:textAnnotation id="TextAnnotation_0u6t2kz">
+      <bpmn:text>Система не прошла тест-драйв</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Association_1rmkpb4" associationDirection="None" sourceRef="Flow_1ywnxml" targetRef="TextAnnotation_0u6t2kz" />
   </bpmn:collaboration>
   <bpmn:process id="Process_1p16tp4" isExecutable="true" camunda:historyTimeToLive="P180D">
     <bpmn:laneSet id="LaneSet_1whxlqe">
@@ -157,6 +161,7 @@
         <bpmn:flowNodeRef>Activity_1rt6csz</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_0yl5rm6</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Event_Success</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_1n2411l</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="StartEvent_1">
@@ -297,11 +302,11 @@
     </bpmn:exclusiveGateway>
     <bpmn:userTask id="Activity_0p38zs6" name="Проверка системы и тест-драйв" camunda:candidateGroups="ACCEPTOR">
       <bpmn:incoming>Flow_128rqxf</bpmn:incoming>
-      <bpmn:outgoing>Flow_0ytffyl</bpmn:outgoing>
+      <bpmn:outgoing>Flow_115blco</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:serviceTask id="Activity_1yuq8rv" name="Подготовка  документации и актов для передачи клиенту" camunda:delegateExpression="${generateDocumentationDelegate}">
-      <bpmn:incoming>Flow_0ytffyl</bpmn:incoming>
       <bpmn:incoming>Flow_1nimzo3</bpmn:incoming>
+      <bpmn:incoming>Flow_0nrcfk2</bpmn:incoming>
       <bpmn:outgoing>Flow_DocToBD</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:intermediateCatchEvent id="Event_07uzumh" name="Выдача автомобиля клиенту">
@@ -330,6 +335,7 @@
     <bpmn:userTask id="Activity_0kgksar" name="Выявление причины неисправности" camunda:candidateGroups="ENGINEER">
       <bpmn:incoming>Flow_0xli0u8</bpmn:incoming>
       <bpmn:incoming>Flow_1bsqy4y</bpmn:incoming>
+      <bpmn:incoming>Flow_1ywnxml</bpmn:incoming>
       <bpmn:outgoing>Flow_1mdedj6</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:exclusiveGateway id="Gateway_1hnsji6" default="Flow_00l5n2e">
@@ -403,7 +409,6 @@
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${systemHealthy == false}</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_128rqxf" sourceRef="Gateway_1ocu6ms" targetRef="Activity_0p38zs6" />
-    <bpmn:sequenceFlow id="Flow_0ytffyl" sourceRef="Activity_0p38zs6" targetRef="Activity_1yuq8rv" />
     <bpmn:sequenceFlow id="Flow_1nimzo3" sourceRef="Event_07uzumh" targetRef="Activity_1yuq8rv" />
     <bpmn:sequenceFlow id="Flow_DocToBD" sourceRef="Activity_1yuq8rv" targetRef="Activity_0vj13l3" />
     <bpmn:sequenceFlow id="Flow_BDToTransfer" sourceRef="Activity_0vj13l3" targetRef="Activity_1rt6csz" />
@@ -418,26 +423,34 @@
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_1cc61nb" sourceRef="Activity_05mqhxj" targetRef="Activity_08k31yn" />
     <bpmn:sequenceFlow id="Flow_15w79cj" sourceRef="Activity_08k31yn" targetRef="Event_1dolso7" />
+    <bpmn:sequenceFlow id="Flow_115blco" sourceRef="Activity_0p38zs6" targetRef="Gateway_1n2411l" />
+    <bpmn:exclusiveGateway id="Gateway_1n2411l" default="Flow_0nrcfk2">
+      <bpmn:incoming>Flow_115blco</bpmn:incoming>
+      <bpmn:outgoing>Flow_0nrcfk2</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1ywnxml</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_0nrcfk2" sourceRef="Gateway_1n2411l" targetRef="Activity_1yuq8rv" />
+    <bpmn:sequenceFlow id="Flow_1ywnxml" sourceRef="Gateway_1n2411l" targetRef="Activity_0kgksar" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_0xh2fmy">
       <bpmndi:BPMNShape id="Participant_0e3gto7_di" bpmnElement="Participant_0e3gto7" isHorizontal="true">
-        <dc:Bounds x="160" y="80" width="3220" height="1280" />
+        <dc:Bounds x="160" y="80" width="3390" height="1280" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_07xxxoz_di" bpmnElement="Lane_07xxxoz" isHorizontal="true">
-        <dc:Bounds x="190" y="80" width="3190" height="340" />
+        <dc:Bounds x="190" y="80" width="3360" height="350" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_1bibgio_di" bpmnElement="Lane_1bibgio" isHorizontal="true">
-        <dc:Bounds x="190" y="1080" width="3190" height="280" />
+        <dc:Bounds x="190" y="1080" width="3360" height="280" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_0x43q38_di" bpmnElement="Lane_0x43q38" isHorizontal="true">
-        <dc:Bounds x="190" y="760" width="3190" height="320" />
+        <dc:Bounds x="190" y="760" width="3360" height="320" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_189k7xy_di" bpmnElement="Lane_189k7xy" isHorizontal="true">
-        <dc:Bounds x="190" y="420" width="3190" height="340" />
+        <dc:Bounds x="190" y="430" width="3360" height="330" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
@@ -595,6 +608,9 @@
         <bpmndi:BPMNLabel>
           <dc:Bounds x="3209" y="685" width="62" height="40" />
         </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1n2411l_di" bpmnElement="Gateway_1n2411l" isMarkerVisible="true">
+        <dc:Bounds x="2655" y="345" width="50" height="50" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_1gywq7c_di" bpmnElement="Flow_1gywq7c">
         <di:waypoint x="258" y="250" />
@@ -775,10 +791,6 @@
         <di:waypoint x="2550" y="522" />
         <di:waypoint x="2625" y="522" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0ytffyl_di" bpmnElement="Flow_0ytffyl">
-        <di:waypoint x="2680" y="487" />
-        <di:waypoint x="2680" y="265" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1nimzo3_di" bpmnElement="Flow_1nimzo3">
         <di:waypoint x="2548" y="230" />
         <di:waypoint x="2625" y="230" />
@@ -820,9 +832,23 @@
         <di:waypoint x="3165" y="660" />
         <di:waypoint x="3222" y="660" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_1jcf24f_di" bpmnElement="Association_1jcf24f">
-        <di:waypoint x="1797" y="855" />
-        <di:waypoint x="1821" y="872" />
+      <bpmndi:BPMNEdge id="Flow_115blco_di" bpmnElement="Flow_115blco">
+        <di:waypoint x="2680" y="487" />
+        <di:waypoint x="2680" y="395" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0nrcfk2_di" bpmnElement="Flow_0nrcfk2">
+        <di:waypoint x="2680" y="345" />
+        <di:waypoint x="2680" y="265" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1ywnxml_di" bpmnElement="Flow_1ywnxml">
+        <di:waypoint x="2705" y="370" />
+        <di:waypoint x="2790" y="370" />
+        <di:waypoint x="2790" y="560" />
+        <di:waypoint x="2695" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_1rmkpb4_di" bpmnElement="Association_1rmkpb4">
+        <di:waypoint x="2790" y="370" />
+        <di:waypoint x="2840" y="353" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="TextAnnotation_0tv87i5_di" bpmnElement="TextAnnotation_0tv87i5">
         <dc:Bounds x="940" y="590" width="100" height="41" />
@@ -936,6 +962,14 @@
         <di:waypoint x="2565" y="660" />
         <di:waypoint x="2617" y="620" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_1jcf24f_di" bpmnElement="Association_1jcf24f">
+        <di:waypoint x="1797" y="855" />
+        <di:waypoint x="1821" y="872" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="TextAnnotation_0u6t2kz_di" bpmnElement="TextAnnotation_0u6t2kz">
+        <dc:Bounds x="2840" y="320" width="99.99274099883856" height="54.587688734030195" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>
