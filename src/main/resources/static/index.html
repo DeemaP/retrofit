@@ -460,7 +460,8 @@ function buildCodingForm(task) {
   ]);
 }
 
-// Чек-лист слесарно-монтажных работ (assembly = монтаж, disassembly = демонтаж)
+// Чек-лист слесарно-монтажных работ (assembly = монтаж, disassembly = демонтаж).
+// Промежуточное сохранение разрешено; завершить можно только при всех отмеченных пунктах.
 async function buildChecklistForm(task, kind) {
   const wrap = el("div", { className: "form-grid" });
   const rows = [];
@@ -468,21 +469,46 @@ async function buildChecklistForm(task, kind) {
   try { items = await http("GET", `/orders/${currentOrderId}/${kind}`) || []; } catch (e) { items = []; }
 
   const box = el("div", {});
+  const payload = () => rows.map(r => ({ title: r.title, done: r.cb.checked }));
+  const allDone = () => rows.length > 0 && rows.every(r => r.cb.checked);
+
+  const saveProgress = el("button", { className: "ghost", textContent: "Сохранить прогресс" });
+  const finish = el("button", { textContent: "Завершить" });
+  const hint = el("div", { className: "muted" });
+  const updateState = () => {
+    const left = rows.filter(r => !r.cb.checked).length;
+    finish.disabled = !allDone();
+    hint.textContent = allDone()
+      ? "Все этапы выполнены — можно завершать."
+      : `Осталось отметить этапов: ${left}. Можно сохранить прогресс и продолжить позже.`;
+  };
+
   for (const it of items) {
     const cb = el("input", { type: "checkbox", checked: it.done });
     cb.style.width = "auto";
+    cb.onchange = updateState;
     rows.push({ cb, title: it.title });
     box.append(el("label", { style: "display:flex;gap:8px;align-items:center;color:var(--text);margin:4px 0" }, [
       cb, it.title
     ]));
   }
-  const submit = el("button", { textContent: "Сохранить и завершить" });
-  submit.onclick = async () => {
-    const payload = rows.map(r => ({ title: r.title, done: r.cb.checked }));
-    await http("POST", `/orders/${currentOrderId}/${kind}`, { items: payload, taskId: task.id });
+
+  saveProgress.onclick = async () => {
+    await http("POST", `/orders/${currentOrderId}/${kind}`, { items: payload() });
     await refresh();
   };
-  wrap.append(field(kind === "assembly" ? "Этапы монтажа" : "Этапы демонтажа", box), submit);
+  finish.onclick = async () => {
+    if (!allDone()) return;
+    await http("POST", `/orders/${currentOrderId}/${kind}`, { items: payload(), taskId: task.id });
+    await refresh();
+  };
+
+  updateState();
+  wrap.append(
+    field(kind === "assembly" ? "Этапы монтажа" : "Этапы демонтажа", box),
+    hint,
+    el("div", { className: "row" }, [saveProgress, finish])
+  );
   return wrap;
 }
 

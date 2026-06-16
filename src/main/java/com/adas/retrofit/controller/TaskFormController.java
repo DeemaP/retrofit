@@ -43,6 +43,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -220,10 +221,10 @@ public class TaskFormController {
 
     @PostMapping("/assembly")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Сохранить чек-лист монтажа + завершить задачу")
+    @Operation(summary = "Сохранить чек-лист монтажа (промежуточно без taskId; с taskId — завершить при полном заполнении)")
     public void saveAssembly(@PathVariable UUID orderId, @RequestBody ChecklistRequest req) {
         workService.saveChecklist(orderId, WorkPhase.ASSEMBLY, toEntries(req.items()));
-        completeIfPresent(req.taskId(), Map.of());
+        completeChecklistIfRequested(req);
     }
 
     // --- 10. Кодирование и калибровка ---
@@ -263,10 +264,29 @@ public class TaskFormController {
 
     @PostMapping("/disassembly")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Сохранить чек-лист демонтажа + завершить задачу")
+    @Operation(summary = "Сохранить чек-лист демонтажа (промежуточно без taskId; с taskId — завершить при полном заполнении)")
     public void saveDisassembly(@PathVariable UUID orderId, @RequestBody ChecklistRequest req) {
         workService.saveChecklist(orderId, WorkPhase.DISASSEMBLY, toEntries(req.items()));
-        completeIfPresent(req.taskId(), Map.of());
+        completeChecklistIfRequested(req);
+    }
+
+    /**
+     * Завершает задачу чек-листа только если передан taskId и ВСЕ пункты отмечены выполненными.
+     * Без taskId — промежуточное сохранение (задача остаётся активной). Неполный чек-лист
+     * при попытке завершения → 400.
+     */
+    private void completeChecklistIfRequested(ChecklistRequest req) {
+        if (req.taskId() == null || req.taskId().isBlank()) {
+            return;
+        }
+        List<ChecklistItemDto> items = req.items();
+        boolean allDone = items != null && !items.isEmpty()
+                && items.stream().allMatch(ChecklistItemDto::done);
+        if (!allDone) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Нельзя завершить задачу: чек-лист заполнен не полностью");
+        }
+        taskService.complete(req.taskId(), Map.of());
     }
 
     // --- 12. Возврат авто в изначальное состояние (программирование RESTORE) ---
