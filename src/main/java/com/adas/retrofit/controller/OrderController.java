@@ -56,7 +56,6 @@ public class OrderController {
         orderService.getOrder(id); // 404, если заявки нет
         return SupplyResponse.of(
                 supplyService.partsOf(id), supplyService.equipmentOf(id),
-                p -> supplyService.stockOnHand(StockType.PART, p.getArticle(), p.getName()),
-                e -> supplyService.stockOnHand(StockType.EQUIPMENT, e.getArticle(), e.getName()));
+                p -> supplyService.stockOnHand(StockType.PART, p.getArticle(), p.getName()));
     }
 }

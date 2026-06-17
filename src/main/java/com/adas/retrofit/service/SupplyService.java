@@ -56,10 +56,15 @@ public class SupplyService {
         return !shortage && parts.stream().allMatch(Part::isInStock);
     }
 
+    /**
+     * Оборудование — многоразовая оснастка цеха, поэтому количественно не учитывается:
+     * фиксируется только факт наличия. По умолчанию всё необходимое оборудование есть;
+     * демо-override {@code shortage=true} помечает его отсутствующим (для ветки заказа).
+     */
     @Transactional
     public boolean checkEquipmentStock(UUID orderId, boolean shortage) {
         List<Equipment> equipment = equipmentRepository.findByOrderId(orderId);
-        equipment.forEach(e -> e.setInStock(!shortage && onHand(StockType.EQUIPMENT, sku(e.getArticle(), e.getName())) >= e.getQuantity()));
+        equipment.forEach(e -> e.setInStock(!shortage));
         equipmentRepository.saveAll(equipment);
         return !shortage && equipment.stream().allMatch(Equipment::isInStock);
     }
@@ -182,7 +187,7 @@ public class SupplyService {
                 .filter(e -> !e.isInStock())
                 .filter(e -> eIds.isEmpty() || eIds.contains(e.getId()))
                 .forEach(e -> {
-                    replenish(StockType.EQUIPMENT, sku(e.getArticle(), e.getName()), e.getName(), e.getQuantity());
+                    // оборудование количественно не учитывается — только отметка наличия
                     e.setOrdered(true);
                     e.setInStock(true);
                 });
@@ -226,10 +231,8 @@ public class SupplyService {
         equipment.stream()
                 .filter(e -> !e.isIssued())
                 .filter(e -> eIds.isEmpty() || eIds.contains(e.getId()))
-                .forEach(e -> {
-                    consume(StockType.EQUIPMENT, sku(e.getArticle(), e.getName()), e.getQuantity());
-                    e.setIssued(true);
-                });
+                // оборудование не списывается со склада — это многоразовая оснастка
+                .forEach(e -> e.setIssued(true));
         equipmentRepository.saveAll(equipment);
     }
 

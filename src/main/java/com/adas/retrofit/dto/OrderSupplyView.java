@@ -15,10 +15,10 @@ public record OrderSupplyView(
 ) {
 
     public static OrderSupplyView of(SupplyOrderStatus status, List<Part> parts, List<Equipment> equipment,
-                                     ToIntFunction<Part> partStock, ToIntFunction<Equipment> equipmentStock) {
+                                     ToIntFunction<Part> partStock) {
         return new OrderSupplyView(
                 status,
                 parts.stream().map(p -> SupplyResponse.PartView.of(p, partStock.applyAsInt(p))).toList(),
-                equipment.stream().map(e -> SupplyResponse.EquipmentView.of(e, equipmentStock.applyAsInt(e))).toList());
+                equipment.stream().map(SupplyResponse.EquipmentView::of).toList());
     }
 }

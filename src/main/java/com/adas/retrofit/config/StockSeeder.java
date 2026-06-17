@@ -38,17 +38,15 @@ public class StockSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        int created = 0;
+        // На складе количественно учитываются только запчасти (расходники).
+        // Оборудование — многоразовая оснастка, в остатках не ведётся.
         Set<String> partNames = new LinkedHashSet<>();
-        Set<String> equipmentNames = new LinkedHashSet<>();
         for (RetrofitType type : RetrofitType.values()) {
             partNames.addAll(RetrofitCatalog.partsFor(type));
-            equipmentNames.addAll(RetrofitCatalog.equipmentFor(type));
         }
-        created += seed(StockType.PART, partNames);
-        created += seed(StockType.EQUIPMENT, equipmentNames);
+        int created = seed(StockType.PART, partNames);
         if (created > 0) {
-            log.info("Склад: засеяно {} новых позиций (по {} шт.)", created, initialQuantity);
+            log.info("Склад: засеяно {} новых позиций запчастей (по {} шт.)", created, initialQuantity);
         }
     }
 

@@ -21,18 +21,18 @@ public record SupplyResponse(
         }
     }
 
-    public record EquipmentView(UUID id, String name, String article, int quantity,
-                                boolean inStock, boolean ordered, boolean issued, Integer stockOnHand) {
-        public static EquipmentView of(Equipment e, Integer stockOnHand) {
-            return new EquipmentView(e.getId(), e.getName(), e.getArticle(), e.getQuantity(),
-                    e.isInStock(), e.isOrdered(), e.isIssued(), stockOnHand);
+    public record EquipmentView(UUID id, String name, String article,
+                                boolean inStock, boolean ordered, boolean issued) {
+        public static EquipmentView of(Equipment e) {
+            return new EquipmentView(e.getId(), e.getName(), e.getArticle(),
+                    e.isInStock(), e.isOrdered(), e.isIssued());
         }
     }
 
     public static SupplyResponse of(List<Part> parts, List<Equipment> equipment,
-                                    ToIntFunction<Part> partStock, ToIntFunction<Equipment> equipmentStock) {
+                                    ToIntFunction<Part> partStock) {
         return new SupplyResponse(
                 parts.stream().map(p -> PartView.of(p, partStock.applyAsInt(p))).toList(),
-                equipment.stream().map(e -> EquipmentView.of(e, equipmentStock.applyAsInt(e))).toList());
+                equipment.stream().map(EquipmentView::of).toList());
     }
 }

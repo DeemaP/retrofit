@@ -19,7 +19,6 @@ import com.adas.retrofit.dto.SupplyItem;
 import com.adas.retrofit.dto.SupplyListRequest;
 import com.adas.retrofit.dto.SupplyMarkRequest;
 import com.adas.retrofit.entity.DamagePhoto;
-import com.adas.retrofit.entity.Equipment;
 import com.adas.retrofit.entity.Part;
 import com.adas.retrofit.entity.ProgrammingDirection;
 import com.adas.retrofit.entity.StockType;
@@ -192,7 +191,7 @@ public class TaskFormController {
                 supplyService.orderStatus(orderId),
                 supplyService.missingParts(orderId),
                 supplyService.missingEquipment(orderId),
-                this::partStock, this::equipmentStock);
+                this::partStock);
     }
 
     @PostMapping("/order-supply/mark-ordered")
@@ -340,9 +339,5 @@ public class TaskFormController {
 
     private int partStock(Part p) {
         return supplyService.stockOnHand(StockType.PART, p.getArticle(), p.getName());
-    }
-
-    private int equipmentStock(Equipment e) {
-        return supplyService.stockOnHand(StockType.EQUIPMENT, e.getArticle(), e.getName());
     }
 }

@@ -705,7 +705,7 @@ async function refresh() {
     ? supply.parts.map(p => `<li>${p.name}${p.article ? ` <code>${p.article}</code>` : ""} ×${p.quantity} ${stock(p.inStock, p.stockOnHand)}${ord(p.ordered && !p.inStock)}${iss(p.issued)}</li>`).join("")
     : '<li class="muted">— список ещё не сформирован</li>';
   equip.innerHTML = supply.equipment.length
-    ? supply.equipment.map(e => `<li>${e.name}${e.article ? ` <code>${e.article}</code>` : ""} ×${e.quantity} ${stock(e.inStock, e.stockOnHand)}${ord(e.ordered && !e.inStock)}${iss(e.issued)}</li>`).join("")
+    ? supply.equipment.map(e => `<li>${e.name}${e.article ? ` <code>${e.article}</code>` : ""} ${stock(e.inStock)}${ord(e.ordered && !e.inStock)}${iss(e.issued)}</li>`).join("")
     : '<li class="muted">— список ещё не сформирован</li>';
 
   // Программирование и калибровка
