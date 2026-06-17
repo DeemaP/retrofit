@@ -14,6 +14,7 @@
 - Camunda Platform 7
 - PostgreSQL 15
 - MinIO (S3-совместимое хранилище фотофиксации повреждений)
+- Mailpit (локальный SMTP-«ловец» для оповещений о назначении задач)
 - Maven
 
 ## Запуск через Docker (рекомендуется)
@@ -27,7 +28,7 @@
 docker compose up -d --build
 ```
 
-Поднимутся три контейнера: `adas-app`, `adas-postgres`, `adas-minio`.
+Поднимутся четыре контейнера: `adas-app`, `adas-postgres`, `adas-minio`, `adas-mailpit`.
 Первая сборка занимает несколько минут (скачивание зависимостей), последующие — быстрее
 за счёт кэша слоёв.
 
@@ -46,8 +47,10 @@ docker compose logs -f app      # ждём строку "Started AdasRetrofitApp
 | Swagger UI | http://localhost:8080/swagger-ui.html | — |
 | Camunda Cockpit | http://localhost:8080/camunda | `admin` / `admin` |
 | MinIO консоль | http://localhost:9001 | `minioadmin` / `minioadmin` |
+| Mailpit (входящие оповещения) | http://localhost:8025 | — |
 
-Нужны свободные порты: **8080** (приложение), **5432** (PostgreSQL), **9000/9001** (MinIO).
+Нужны свободные порты: **8080** (приложение), **5432** (PostgreSQL), **9000/9001** (MinIO),
+**1025/8025** (Mailpit SMTP / веб-почта).
 
 ### Управление
 
@@ -71,6 +74,8 @@ docker compose up -d --build app  # пересобрать и перезапус
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | подключение к PostgreSQL | `postgres` / `5432` / `adas` / `adas` / `adas` |
 | `CAMUNDA_ADMIN_USER` / `CAMUNDA_ADMIN_PASSWORD` | админ Cockpit | `admin` / `admin` |
 | `MINIO_ENDPOINT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` | хранилище фото | `http://minio:9000` / `minioadmin` / `minioadmin` / `adas-photos` |
+| `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` | SMTP для оповещений о задачах | `mailpit` / `1025` |
+| `NOTIFY_FROM` / `NOTIFY_DOMAIN` | адрес отправителя / домен адресата по роли | `no-reply@adas.local` / `adas.local` |
 
 Схема БД создаётся и обновляется автоматически (`ddl-auto=update`) — миграции запускать
 вручную не нужно.
@@ -85,6 +90,21 @@ docker compose up -d --build app  # пересобрать и перезапус
 
 Ветка «нет на складе → заказ» включается стартовой переменной процесса
 `partsShortage=true` / `equipmentShortage=true` (через Swagger или Cockpit).
+
+## Оповещения о назначении задач
+
+При появлении любой user task приложение шлёт письмо-оповещение на «почтовый ящик роли»,
+ответственной за задачу (по её `candidateGroups`): например, задача для роли `ENGINEER`
+уходит на `engineer@adas.local`. Реальным адресатам письма не доставляются — их ловит
+**Mailpit**, смотреть входящие: http://localhost:8025.
+
+Реализовано глобальным `TaskListener` на событии `create` (см. `config/TaskNotification*`),
+который навешивается на все задачи при парсинге BPMN — сама модель не меняется.
+
+> При локальном запуске без Docker переменная `SPRING_MAIL_HOST` не задана, поэтому
+> `JavaMailSender` не создаётся и оповещения автоматически отключаются (процесс работает
+> как обычно). Чтобы включить их локально — поднимите Mailpit и задайте
+> `SPRING_MAIL_HOST=localhost`, `SPRING_MAIL_PORT=1025`.
 
 ## Локальный запуск без Docker (опционально)
 

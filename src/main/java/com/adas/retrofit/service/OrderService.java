@@ -138,10 +138,10 @@ public class OrderService {
 
     /** Переводит заявку в COMPLETED (вызывается листенером Event_Success). */
     @Transactional
-    public void markCompleted(UUID orderId) {
+    public Order markCompleted(UUID orderId) {
         Order order = getOrder(orderId);
         order.setStatus(OrderStatus.COMPLETED);
-        orderRepository.save(order);
+        return orderRepository.save(order);
     }
 
     static TaskView toTaskView(Task task) {

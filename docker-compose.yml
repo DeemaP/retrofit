@@ -34,6 +34,20 @@ services:
       timeout: 5s
       retries: 10
 
+  # Локальный SMTP-«ловец»: ловит все письма, реальным адресатам не доставляет.
+  # Веб-почта: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: adas-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # веб-интерфейс
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   app:
     build: .
     container_name: adas-app
@@ -41,6 +55,8 @@ services:
       postgres:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
     environment:
       DB_HOST: postgres
@@ -54,6 +70,8 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: adas-photos
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
     ports:
       - "8080:8080"
 

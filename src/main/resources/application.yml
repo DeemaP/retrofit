@@ -43,6 +43,16 @@ camunda:
     # авто-деплой BPMN из classpath (src/main/resources/bpmn/*.bpmn)
     deployment-resource-pattern: "classpath*:**/*.bpmn"
 
+# Почтовые оповещения о назначении user task.
+# SMTP-хост намеренно не задан здесь: без переменной окружения SPRING_MAIL_HOST
+# (docker compose ставит её = mailpit) Spring не создаёт JavaMailSender, и оповещения
+# просто отключаются — удобно для тестов и локального запуска без почтового сервера.
+notifications:
+  # адрес отправителя
+  from: ${NOTIFY_FROM:no-reply@adas.local}
+  # домен, к которому приклеивается имя роли: ENGINEER -> engineer@adas.local
+  recipient-domain: ${NOTIFY_DOMAIN:adas.local}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
