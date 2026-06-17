@@ -17,8 +17,12 @@ import com.adas.retrofit.dto.ProgrammingView;
 import com.adas.retrofit.dto.RequirementsRequest;
 import com.adas.retrofit.dto.SupplyItem;
 import com.adas.retrofit.dto.SupplyListRequest;
+import com.adas.retrofit.dto.SupplyMarkRequest;
 import com.adas.retrofit.entity.DamagePhoto;
+import com.adas.retrofit.entity.Equipment;
+import com.adas.retrofit.entity.Part;
 import com.adas.retrofit.entity.ProgrammingDirection;
+import com.adas.retrofit.entity.StockType;
 import com.adas.retrofit.entity.SupplyOrderStatus;
 import com.adas.retrofit.entity.WorkPhase;
 import com.adas.retrofit.service.OrderService;
@@ -182,20 +186,39 @@ public class TaskFormController {
     // --- 7. Заказ недостающих запчастей и оборудования (статусы) ---
 
     @GetMapping("/order-supply")
-    @Operation(summary = "Что нужно заказать (отсутствующее) + текущий статус заказа")
+    @Operation(summary = "Что нужно заказать (отсутствующее) + сводный статус заказа")
     public OrderSupplyView orderSupply(@PathVariable UUID orderId) {
         return OrderSupplyView.of(
                 supplyService.orderStatus(orderId),
                 supplyService.missingParts(orderId),
-                supplyService.missingEquipment(orderId));
+                supplyService.missingEquipment(orderId),
+                this::partStock, this::equipmentStock);
+    }
+
+    @PostMapping("/order-supply/mark-ordered")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Отметить выбранные позиции заказанными (пустые списки = все недостающие)")
+    public void markOrdered(@PathVariable UUID orderId, @RequestBody SupplyMarkRequest req) {
+        supplyService.markOrdered(orderId, req.partIds(), req.equipmentIds());
+    }
+
+    @PostMapping("/order-supply/mark-received")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Отметить выбранные позиции поступившими (пополнить склад); "
+            + "когда поступило всё и передан taskId — завершить задачу")
+    public void markReceived(@PathVariable UUID orderId, @RequestBody SupplyMarkRequest req) {
+        supplyService.markReceived(orderId, req.partIds(), req.equipmentIds());
+        if (supplyService.allReceived(orderId)) {
+            completeIfPresent(req.taskId(), Map.of());
+        }
     }
 
     @PostMapping("/order-supply/advance")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Продвинуть статус заказа; на RECEIVED (с taskId) завершить задачу")
+    @Operation(summary = "Продвинуть заказ целиком; на RECEIVED (с taskId) завершить задачу")
     public void advanceOrder(@PathVariable UUID orderId, @RequestBody AdvanceOrderRequest req) {
         supplyService.advanceOrderStatus(orderId, req.status());
-        if (req.status() == SupplyOrderStatus.RECEIVED) {
+        if (req.status() == SupplyOrderStatus.RECEIVED && supplyService.allReceived(orderId)) {
             completeIfPresent(req.taskId(), Map.of());
         }
     }
@@ -313,5 +336,13 @@ public class TaskFormController {
         if (taskId != null && !taskId.isBlank()) {
             taskService.complete(taskId, variables);
         }
+    }
+
+    private int partStock(Part p) {
+        return supplyService.stockOnHand(StockType.PART, p.getArticle(), p.getName());
+    }
+
+    private int equipmentStock(Equipment e) {
+        return supplyService.stockOnHand(StockType.EQUIPMENT, e.getArticle(), e.getName());
     }
 }

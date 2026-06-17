@@ -341,38 +341,67 @@ async function buildOrderSupplyForm(task) {
   const data = await http("GET", `/orders/${currentOrderId}/order-supply`);
   const status = data.status || "TO_ORDER";
 
-  const missing = [
-    ...data.parts.map(p => `${p.name}${p.article ? " (" + p.article + ")" : ""} ×${p.quantity}`),
-    ...data.equipment.map(e => `${e.name}${e.article ? " (" + e.article + ")" : ""}`)
+  // Недостающие позиции с их подсостоянием: «требуется заказать» / «заказано, ожидание».
+  const items = [
+    ...data.parts.map(p => ({ kind: "part", it: p })),
+    ...data.equipment.map(e => ({ kind: "equipment", it: e }))
   ];
-  const list = el("ul", { className: "items" });
-  if (missing.length) missing.forEach(m => list.append(el("li", { textContent: m })));
-  else list.append(el("li", { className: "muted", textContent: "— недостающих позиций нет" }));
 
   const statusLine = el("div", {}, [
     "Статус заказа: ",
     el("strong", { textContent: ORDER_STATUS_LABEL[status] || status })
   ]);
+  wrap.append(statusLine);
 
-  wrap.append(field("Нужно заказать", list), statusLine);
-
-  if (status === "TO_ORDER") {
-    const b = el("button", { textContent: "Оформить заказ → «Заказано»" });
-    b.onclick = async () => {
-      await http("POST", `/orders/${currentOrderId}/order-supply/advance`, { status: "ORDERED" });
-      await refresh();
-    };
-    wrap.append(b);
-  } else if (status === "ORDERED") {
-    const b = el("button", { textContent: "Отметить «Поступило» и завершить" });
-    b.onclick = async () => {
-      await http("POST", `/orders/${currentOrderId}/order-supply/advance`, { status: "RECEIVED", taskId: task.id });
-      await refresh();
-    };
-    wrap.append(b);
-  } else {
+  if (items.length === 0) {
+    wrap.append(el("div", { className: "muted", textContent: "Все недостающие позиции поступили." }));
     wrap.append(genericComplete(task));
+    return wrap;
   }
+
+  const list = el("div", { className: "form-grid" });
+  const checks = []; // { kind, id, cb }
+  for (const { kind, it } of items) {
+    const cb = el("input", { type: "checkbox", checked: true });
+    cb.style.width = "auto";
+    checks.push({ kind, id: it.id, cb });
+    const state = it.ordered
+      ? '<span class="muted">⟳ заказано, ожидание</span>'
+      : '<span class="warn-text">требуется заказать</span>';
+    const qty = (it.quantity ? ` ×${it.quantity}` : "");
+    const onHand = (it.stockOnHand === null || it.stockOnHand === undefined) ? "" : ` <span class="muted">(на складе: ${it.stockOnHand})</span>`;
+    const label = el("label", { style: "display:flex;gap:8px;align-items:center;color:var(--text);margin:4px 0" });
+    label.append(cb, el("span", { innerHTML: `${it.name}${it.article ? ` <code>${it.article}</code>` : ""}${qty} — ${state}${onHand}` }));
+    list.append(label);
+  }
+  wrap.append(field("Недостающие позиции", list));
+
+  const selected = pred => {
+    const sel = checks.filter(c => c.cb.checked && pred(c));
+    return {
+      partIds: sel.filter(c => c.kind === "part").map(c => c.id),
+      equipmentIds: sel.filter(c => c.kind === "equipment").map(c => c.id)
+    };
+  };
+
+  const orderBtn = el("button", { textContent: "Отметить «Заказано» (выбранные)" });
+  orderBtn.onclick = async () => {
+    await http("POST", `/orders/${currentOrderId}/order-supply/mark-ordered`, selected(() => true));
+    await refresh();
+  };
+
+  const recvBtn = el("button", { textContent: "Отметить «Поступило» (выбранные)" });
+  recvBtn.onclick = async () => {
+    // taskId — чтобы задача завершилась автоматически, когда поступит всё
+    await http("POST", `/orders/${currentOrderId}/order-supply/mark-received`,
+      { ...selected(() => true), taskId: task.id });
+    await refresh();
+  };
+
+  const row = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" });
+  row.append(orderBtn, recvBtn);
+  wrap.append(row);
+  wrap.append(el("div", { className: "muted", textContent: "Когда все позиции отмечены поступившими — задача завершается и процесс идёт дальше." }));
   return wrap;
 }
 
@@ -668,13 +697,15 @@ async function refresh() {
   // Снабжение
   const parts = document.getElementById("parts");
   const equip = document.getElementById("equipment");
-  const stock = ok => ok ? '<span class="ok-text">✓ в наличии</span>' : '<span class="warn-text">нет на складе</span>';
+  const onHand = n => (n === null || n === undefined) ? "" : ` <span class="muted">(на складе: ${n})</span>`;
+  const stock = (ok, n) => (ok ? '<span class="ok-text">✓ в наличии</span>' : '<span class="warn-text">нет на складе</span>') + onHand(n);
+  const ord = on => on ? ' <span class="muted">⟳ заказано</span>' : "";
   const iss = on => on ? ' <span class="ok-text">⮌ выдано</span>' : "";
   parts.innerHTML = supply.parts.length
-    ? supply.parts.map(p => `<li>${p.name}${p.article ? ` <code>${p.article}</code>` : ""} ×${p.quantity} ${stock(p.inStock)}${iss(p.issued)}</li>`).join("")
+    ? supply.parts.map(p => `<li>${p.name}${p.article ? ` <code>${p.article}</code>` : ""} ×${p.quantity} ${stock(p.inStock, p.stockOnHand)}${ord(p.ordered && !p.inStock)}${iss(p.issued)}</li>`).join("")
     : '<li class="muted">— список ещё не сформирован</li>';
   equip.innerHTML = supply.equipment.length
-    ? supply.equipment.map(e => `<li>${e.name}${e.article ? ` <code>${e.article}</code>` : ""} ${stock(e.inStock)}${iss(e.issued)}</li>`).join("")
+    ? supply.equipment.map(e => `<li>${e.name}${e.article ? ` <code>${e.article}</code>` : ""} ×${e.quantity} ${stock(e.inStock, e.stockOnHand)}${ord(e.ordered && !e.inStock)}${iss(e.issued)}</li>`).join("")
     : '<li class="muted">— список ещё не сформирован</li>';
 
   // Программирование и калибровка

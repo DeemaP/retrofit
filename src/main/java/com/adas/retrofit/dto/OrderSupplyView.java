@@ -5,18 +5,20 @@ import com.adas.retrofit.entity.Part;
 import com.adas.retrofit.entity.SupplyOrderStatus;
 
 import java.util.List;
+import java.util.function.ToIntFunction;
 
-/** Состояние заказа недостающего: текущий статус + списки отсутствующих запчастей/оборудования. */
+/** Состояние заказа недостающего: сводный статус + списки отсутствующих запчастей/оборудования. */
 public record OrderSupplyView(
         SupplyOrderStatus status,
         List<SupplyResponse.PartView> parts,
         List<SupplyResponse.EquipmentView> equipment
 ) {
 
-    public static OrderSupplyView of(SupplyOrderStatus status, List<Part> parts, List<Equipment> equipment) {
+    public static OrderSupplyView of(SupplyOrderStatus status, List<Part> parts, List<Equipment> equipment,
+                                     ToIntFunction<Part> partStock, ToIntFunction<Equipment> equipmentStock) {
         return new OrderSupplyView(
                 status,
-                parts.stream().map(SupplyResponse.PartView::of).toList(),
-                equipment.stream().map(SupplyResponse.EquipmentView::of).toList());
+                parts.stream().map(p -> SupplyResponse.PartView.of(p, partStock.applyAsInt(p))).toList(),
+                equipment.stream().map(e -> SupplyResponse.EquipmentView.of(e, equipmentStock.applyAsInt(e))).toList());
     }
 }

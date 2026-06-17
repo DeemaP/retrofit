@@ -4,6 +4,7 @@ import com.adas.retrofit.dto.CreateOrderRequest;
 import com.adas.retrofit.dto.OrderResponse;
 import com.adas.retrofit.dto.SupplyResponse;
 import com.adas.retrofit.entity.Order;
+import com.adas.retrofit.entity.StockType;
 import com.adas.retrofit.service.OrderService;
 import com.adas.retrofit.service.SupplyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +54,9 @@ public class OrderController {
     @Operation(summary = "Списки снабжения заявки: запчасти и оборудование")
     public SupplyResponse supply(@PathVariable UUID id) {
         orderService.getOrder(id); // 404, если заявки нет
-        return SupplyResponse.of(supplyService.partsOf(id), supplyService.equipmentOf(id));
+        return SupplyResponse.of(
+                supplyService.partsOf(id), supplyService.equipmentOf(id),
+                p -> supplyService.stockOnHand(StockType.PART, p.getArticle(), p.getName()),
+                e -> supplyService.stockOnHand(StockType.EQUIPMENT, e.getArticle(), e.getName()));
     }
 }
