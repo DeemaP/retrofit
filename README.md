@@ -19,38 +19,74 @@
 
 ## Запуск через Docker (рекомендуется)
 
-Образ приложения собирается **внутри контейнера** (Maven + Temurin 17), поэтому на машине
-нужны только **Docker** и **Docker Compose v2** + интернет (для загрузки базовых образов и
-зависимостей). Java и Maven локально ставить НЕ нужно.
+Приложение собирается и запускается полностью в контейнерах — **ничего, кроме Docker,
+ставить не нужно** (ни Java, ни Maven, ни PostgreSQL). Подходит для любой ОС: Windows,
+macOS, Linux.
+
+### Требования
+
+- **Docker** с **Docker Compose v2**:
+  - Windows / macOS — [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+    (Compose v2 уже встроен);
+  - Linux — Docker Engine + плагин `docker-compose-plugin`.
+  - Проверка: `docker --version` и `docker compose version` должны отвечать.
+- **Интернет** при первом запуске — скачиваются базовые образы и Maven-зависимости.
+- **Свободные порты** на localhost: `8080` (приложение), `5432` (PostgreSQL),
+  `9000`/`9001` (MinIO), `1025`/`8025` (Mailpit). Если порт занят — см. «Решение проблем».
+
+### Шаги
 
 ```bash
-# из корня проекта
+# 1. Получить код
+git clone <repository-url> adas-retrofit
+cd adas-retrofit
+
+# 2. Собрать и запустить весь стек (4 контейнера)
 docker compose up -d --build
+
+# 3. Дождаться готовности приложения
+docker compose ps                 # все сервисы должны быть Up / healthy
+docker compose logs -f app        # ждём строку "Started AdasRetrofitApplication", затем Ctrl+C
 ```
 
-Поднимутся четыре контейнера: `adas-app`, `adas-postgres`, `adas-minio`, `adas-mailpit`.
-Первая сборка занимает несколько минут (скачивание зависимостей), последующие — быстрее
-за счёт кэша слоёв.
+Поднимутся четыре контейнера: `adas-app` (приложение), `adas-postgres` (БД),
+`adas-minio` (хранилище фото), `adas-mailpit` (почта). Первая сборка занимает несколько
+минут (скачивание зависимостей), последующие запуски — секунды (кэш слоёв + готовый образ).
 
-Проверить состояние и дождаться готовности приложения:
+После старта проверить, что приложение отвечает:
 
 ```bash
-docker compose ps
-docker compose logs -f app      # ждём строку "Started AdasRetrofitApplication"
+curl http://localhost:8080/api/v1/stock     # должен вернуться JSON со складскими остатками
 ```
 
-### Точки входа
+### Точки входа (всё, что можно посмотреть)
 
-| Что | URL | Доступ |
-|-----|-----|--------|
-| Веб-пульт оператора | http://localhost:8080/ | — |
-| Swagger UI | http://localhost:8080/swagger-ui.html | — |
-| Camunda Cockpit | http://localhost:8080/camunda | `admin` / `admin` |
-| MinIO консоль | http://localhost:9001 | `minioadmin` / `minioadmin` |
-| Mailpit (входящие оповещения) | http://localhost:8025 | — |
+Интерфейсы (открывать в браузере):
 
-Нужны свободные порты: **8080** (приложение), **5432** (PostgreSQL), **9000/9001** (MinIO),
-**1025/8025** (Mailpit SMTP / веб-почта).
+| Что | URL | Доступ | Что увидеть |
+|-----|-----|--------|-------------|
+| Веб-пульт оператора | http://localhost:8080/ | — | Создание заявки и прохождение процесса по формам задач |
+| Swagger UI | http://localhost:8080/swagger-ui.html | — | Все REST-эндпоинты, можно дёргать вручную |
+| Camunda Cockpit | http://localhost:8080/camunda | `admin` / `admin` | Запущенные процессы, токены, история, BPMN-схема |
+| Mailpit (почта) | http://localhost:8025 | — | Письма-оповещения о задачах и отчёт клиенту |
+| MinIO консоль | http://localhost:9001 | `minioadmin` / `minioadmin` | Загруженные фото фотофиксации повреждений |
+
+Основные группы REST API (детали и «попробовать» — в Swagger UI):
+
+| Группа | База | Назначение |
+|--------|------|-----------|
+| Orders | `GET/POST /api/v1/orders` | Заявки: создать, посмотреть, список |
+| Task forms | `/api/v1/orders/{orderId}/...` | Формы шагов процесса (приёмка, ТЗ, списки, заказ, выдача, монтаж, кодирование, калибровка) |
+| Tasks | `/api/v1/tasks` | Активные user task, завершение задач |
+| Stock | `GET/POST /api/v1/stock` | Складские остатки: просмотр и корректировка количества |
+
+Инфраструктура (для отладки/подключения инструментами):
+
+| Сервис | Адрес | Доступ |
+|--------|-------|--------|
+| PostgreSQL | `localhost:5432`, БД `adas` | `adas` / `adas` |
+| MinIO S3 API | http://localhost:9000 | `minioadmin` / `minioadmin` |
+| Mailpit SMTP | `localhost:1025` | — |
 
 ### Управление
 
@@ -79,6 +115,18 @@ docker compose up -d --build app  # пересобрать и перезапус
 
 Схема БД создаётся и обновляется автоматически (`ddl-auto=update`) — миграции запускать
 вручную не нужно.
+
+### Решение проблем
+
+- **Порт занят** (`bind: address already in use`) — освободите порт или поменяйте левую часть
+  проброса в `docker-compose.yml` (например, `"8081:8080"`) и откройте приложение на новом порту.
+- **Приложение не стартует / падает** — смотрите логи: `docker compose logs app`. Частая
+  причина — не успела подняться БД; контейнер `app` ждёт `postgres` по healthcheck, повторный
+  `docker compose up -d` обычно решает.
+- **Нужен чистый старт с нуля** (сбросить БД Camunda, заявки, фото) —
+  `docker compose down -v && docker compose up -d --build`.
+- **Изменили код** — пересоберите только приложение: `docker compose up -d --build app`.
+- **Проверить, что всё запущено** — `docker compose ps` (все сервисы `Up`/`healthy`).
 
 ## Как пройти процесс
 
